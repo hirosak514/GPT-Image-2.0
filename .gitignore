@@ -1,0 +1,18 @@
+# APIキーなどの秘密情報（最重要！）
+.env
+
+# Pythonのキャッシュ・実行環境
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Streamlit固有の設定
+.streamlit/config.toml
+!.streamlit/secrets.toml  # ローカルでテストする場合のみ。基本はGitHubに上げない。
+
+# OS固有の不要ファイル
+.DS_Store
+Thumbs.db
