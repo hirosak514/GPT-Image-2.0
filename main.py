@@ -30,7 +30,7 @@ st.sidebar.success("認証済み")
 # 4. APIクライアントの初期化
 client = OpenAI(api_key=API_KEY)
 
-# 5. 画像をBase64にエンコードする関数（Vision API用）
+# 5. 画像をBase64にエンコードする関数
 def encode_image(uploaded_file):
     return base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
 
@@ -39,13 +39,13 @@ st.title("🎨 GPT Image 2.0 Generator")
 st.write("参照画像やプロンプトを元に画像を生成します（従量課金）")
 
 with st.form("gen_form"):
-    # 【新機能】参照画像のアップロード
+    # 参照画像のアップロード
     uploaded_file = st.file_uploader("参照画像をアップロード（任意）", type=["png", "jpg", "jpeg"])
     
     if uploaded_file:
         st.image(uploaded_file, caption="アップロードされた参照画像", width=200)
 
-    prompt = st.text_area("追加のプロンプト・指示", placeholder="例: アップロードした写真の男性をアフロヘアにして、ファンク歌手として歌っている姿。")
+    prompt = st.text_area("追加のプロンプト・指示", placeholder="例: スタンドマイクで歌っている。アニメスタイルで。")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -83,7 +83,7 @@ if submit_button:
             try:
                 final_prompt = prompt
                 
-                # 画像がアップロードされている場合、Vision APIで内容を言語化
+                # 画像がある場合、Vision APIで「ポリシーに安全なプロンプト」へ変換
                 if uploaded_file:
                     base64_image = encode_image(uploaded_file)
                     vision_response = client.chat.completions.create(
@@ -92,7 +92,15 @@ if submit_button:
                             {
                                 "role": "user",
                                 "content": [
-                                    {"type": "text", "text": "この画像の内容を画像生成AI用の詳細な英語プロンプトに変換してください。ユーザーの指示も考慮してください: " + prompt},
+                                    {
+                                        "type": "text", 
+                                        "text": (
+                                            "Convert this image into a detailed descriptive English prompt for DALL-E 3. "
+                                            "CRITICAL SAFETY RULE: Do not mention any names of real people, celebrities, or specific copyrighted characters. "
+                                            "Instead, describe their appearance (e.g., hair style, clothing, age, gender) in generic terms. "
+                                            f"Also, incorporate the following user's modification request: {prompt}"
+                                        )
+                                    },
                                     {
                                         "type": "image_url",
                                         "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
@@ -100,11 +108,11 @@ if submit_button:
                                 ],
                             }
                         ],
-                        max_tokens=300,
+                        max_tokens=500,
                     )
                     final_prompt = vision_response.choices[0].message.content
 
-                # DALL-E 3 (GPT Image 2.0) で画像生成
+                # DALL-E 3 で画像生成
                 response = client.images.generate(
                     model="dall-e-3",
                     prompt=final_prompt,
@@ -121,7 +129,11 @@ if submit_button:
                 st.markdown(f"🔗 [フルサイズ画像をブラウザで開く]({image_url})")
                 
             except Exception as e:
-                st.error(f"エラーが発生しました: {e}")
+                # ポリシーエラーの場合、より分かりやすい警告を表示
+                if "content_policy_violation" in str(e):
+                    st.error("セーフティフィルターにより生成が拒否されました。実在の人物に似すぎているか、不適切な表現が含まれている可能性があります。指示を少し変えてみてください。")
+                else:
+                    st.error(f"エラーが発生しました: {e}")
 
 # 8. フッター
 st.divider()
