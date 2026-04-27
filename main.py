@@ -5,12 +5,11 @@ from openai import OpenAI
 st.set_page_config(page_title="Private Image Gen", page_icon="🎨")
 
 # 2. Secretsから設定を読み込み
-# Streamlit Cloudの「Advanced settings」 > 「Secrets」に設定した値を使用します
 try:
     API_KEY = st.secrets["OPENAI_API_KEY"]
     APP_PASSWORD = st.secrets["MY_PASSWORD"]
 except KeyError:
-    st.error("Secretsの設定（OPENAI_API_KEY または MY_PASSWORD）が見つかりません。")
+    st.error("StreamlitのSecrets設定（OPENAI_API_KEY または MY_PASSWORD）が見つかりません。")
     st.stop()
 
 # 3. サイドバーで認証
@@ -35,21 +34,35 @@ st.title("🎨 GPT Image 2.0 Generator")
 st.write("プロンプトを入力して画像を生成します（従量課金）")
 
 with st.form("gen_form"):
-    prompt = st.text_area("プロンプト", placeholder="例: 桜が舞う現代の東京の街並み、アニメスタイル")
+    prompt = st.text_area("プロンプト", placeholder="例: アフロヘアの男性ファンク歌手がステージで歌っている。")
     
     col1, col2 = st.columns(2)
     with col1:
+        # 従量課金コストを抑えたい場合は 'standard'、高品質なら 'hd'
         quality = st.select_slider(
             "画質（コストに影響します）",
-            options=["low", "standard", "hd"],
+            options=["standard", "hd"],
             value="standard"
         )
     with col2:
-        size = st.selectbox(
-            "サイズ",
-            options=["1024x1024", "1024x1792", "1792x1024"],
+        # 出力サイズの選択肢を日本語で分かりやすく追加
+        size_option = st.selectbox(
+            "出力サイズ",
+            options=[
+                "正方形 (1024x1024)", 
+                "スマホ縦画面 (1024x1792)", 
+                "YouTube横画面 (1792x1024)"
+            ],
             index=0
         )
+        
+        # APIに渡す形式に変換
+        if "正方形" in size_option:
+            size = "1024x1024"
+        elif "スマホ縦画面" in size_option:
+            size = "1024x1792"
+        else:
+            size = "1792x1024"
     
     submit_button = st.form_submit_button("画像を生成する")
 
@@ -60,27 +73,29 @@ if submit_button:
     else:
         with st.spinner("AIが画像を作成しています..."):
             try:
-                # GPT Image 2.0 (DALL-E 3) 呼び出し
+                # モデル名を 'dall-e-3' に修正
                 response = client.images.generate(
-                    model="gpt-image-2.0",
+                    model="dall-e-3",
                     prompt=prompt,
                     n=1,
                     size=size,
-                    quality=quality
+                    quality=quality,
+                    response_format="url"
                 )
                 
                 image_url = response.data[0].url
                 
                 # 画像の表示
                 st.divider()
-                st.image(image_url, caption=f"Generated: {prompt[:30]}...")
+                st.image(image_url, caption=f"生成された画像 ({size_option})")
                 
-                # ダウンロードボタンの提供
-                st.markdown(f"[画像をブラウザで開く]({image_url})")
+                # ダウンロードリンク
+                st.markdown(f"🔗 [フルサイズ画像をブラウザで開く]({image_url})")
                 
             except Exception as e:
+                # 残高不足やポリシー違反などのエラー内容を表示
                 st.error(f"エラーが発生しました: {e}")
 
 # 7. フッター
 st.divider()
-st.caption("※このアプリは従量課金APIを使用しています。使いすぎにご注意ください。")
+st.caption("※このアプリは従量課金APIを使用しています。OpenAIの管理画面で利用額を定期的に確認してください。")
